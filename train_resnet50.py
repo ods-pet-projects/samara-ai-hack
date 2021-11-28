@@ -1,3 +1,5 @@
+import sys
+
 import pandas as pd
 import torchvision
 import torch
@@ -85,9 +87,8 @@ def timeit(f):
 def main():
     model_name = 'resnet50'
     num_epochs = 10
-    model_odir = f'trained_models/{model_name}'
-
-    princess_dataset_labelled = '/home/tesla/tigers_bbox/princess_task_data'
+    princess_dataset_labelled = sys.argv[1]
+    model_odir = sys.argv[2]
     print('model_name:', model_name)
 
     model = antialiased_cnns.resnet50(pretrained=True).to(device)
@@ -120,11 +121,11 @@ def main():
     image_datasets = {
         'train':
             nc.SafeDataset(
-                torchvision.datasets.ImageFolder('%s/train' % princess_dataset_labelled,
+                torchvision.datasets.ImageFolder(princess_dataset_labelled,
                                                  data_transforms['train'])),
         'validation':
             nc.SafeDataset(
-                torchvision.datasets.ImageFolder('%s/val' % princess_dataset_labelled,
+                torchvision.datasets.ImageFolder(princess_dataset_labelled,
                                                  data_transforms['validation']))
     }
 
