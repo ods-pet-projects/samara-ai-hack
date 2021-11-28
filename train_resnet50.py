@@ -1,6 +1,7 @@
 import pandas as pd
 import torchvision
 import torch
+from sklearn.metrics import f1_score
 from torchvision import transforms, models
 import cv2
 
@@ -16,9 +17,10 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def train_model(model, image_datasets, dataloaders, criterion, optimizer, num_epochs, odir):
+    lines = []
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch + 1, num_epochs))
-        print('-' * 10)
+        print('-' * 40)
 
         for phase in ['train', 'validation']:
             if phase == 'train':
@@ -28,6 +30,9 @@ def train_model(model, image_datasets, dataloaders, criterion, optimizer, num_ep
 
             running_loss = 0.0
             running_corrects = 0
+
+            pred_phase = []
+            y_true_phase = []
 
             for inputs, labels in dataloaders[phase]:
                 inputs = inputs.to(device)
@@ -44,13 +49,23 @@ def train_model(model, image_datasets, dataloaders, criterion, optimizer, num_ep
                 _, preds = torch.max(outputs, 1)
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
+                pred_phase += list(preds.data.cpu().numpy())
+                y_true_phase += list(labels.data.cpu().numpy())
 
             epoch_loss = running_loss / len(image_datasets[phase])
-            epoch_acc = running_corrects.double() / len(image_datasets[phase])
+            epoch_acc = float(running_corrects.double() / len(image_datasets[phase]))
 
-            print('{} loss: {:.4f}, acc: {:.4f}'.format(phase,
-                                                        epoch_loss,
-                                                        epoch_acc))
+            f1_s = f1_score(y_true_phase, pred_phase)
+            line = dict(epoch=epoch, epoch_loss=epoch_loss, epoch_acc=epoch_acc,
+                        f1=f1_s, phase=phase
+                        )
+            lines.append(line)
+
+            print('{} loss: {:.4f}, acc: {:.4f} f1: {:.4f}'.format(phase,
+                                                                   epoch_loss,
+                                                                   epoch_acc,
+                                                                   f1_s
+                                                                   ))
         os.makedirs(odir, exist_ok=True)
         torch.save(model.state_dict(), f'{odir}/weights_epoch_{epoch}.h5')
     return model
@@ -71,6 +86,8 @@ def main():
     model_name = 'resnet50'
     num_epochs = 10
     model_odir = f'trained_models/{model_name}'
+
+    princess_dataset_labelled = '/home/tesla/tigers_bbox/princess_task_data'
     print('model_name:', model_name)
 
     model = antialiased_cnns.resnet50(pretrained=True).to(device)
@@ -103,11 +120,11 @@ def main():
     image_datasets = {
         'train':
             nc.SafeDataset(
-                torchvision.datasets.ImageFolder('/home/tesla/tigers_bbox/princess_task_data/train',
+                torchvision.datasets.ImageFolder('%s/train' % princess_dataset_labelled,
                                                  data_transforms['train'])),
         'validation':
             nc.SafeDataset(
-                torchvision.datasets.ImageFolder('/home/tesla/tigers_bbox/princess_task_data/val',
+                torchvision.datasets.ImageFolder('%s/val' % princess_dataset_labelled,
                                                  data_transforms['validation']))
     }
 
